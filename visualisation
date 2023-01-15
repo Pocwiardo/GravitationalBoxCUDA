@@ -1,0 +1,41 @@
+import random
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+przed_x = 0,10000
+przed_y = 0,10000
+n=100000
+
+class Point:
+    def __init__(self):
+        self.x = random.uniform(przed_x[0],przed_x[1])
+        self.y = random.uniform(przed_y[0],przed_y[1])
+
+points = []
+px = []
+py = []
+fig, ax = plt.subplots()
+
+for i in range (n):
+    points.append(Point())
+    px.append(points[i].x)
+    py.append(points[i].y)
+
+def frame(i):
+    for p in points:
+        p.x += random.uniform(-0.1, 0.08) * np.sign(p.x)
+        p.y += random.uniform(-0.1, 0.08) * np.sign(p.y)
+
+
+    # Aktualizujemy kolekcję punktów (scatter plot)
+    scatter.set_offsets([[p.x, p.y] for p in points])
+
+
+
+ax.set_xlim(przed_x[0]-5,przed_x[1]+5)
+ax.set_ylim(przed_y[0]-5,przed_y[1]+5)
+scatter = ax.scatter(px,py, marker='.', s=1, color='k', linewidths=0)
+#plt.plot(hullx,hully)
+animation = FuncAnimation(fig, frame, frames=np.arange(10000), interval=200, repeat=False)
+plt.show()

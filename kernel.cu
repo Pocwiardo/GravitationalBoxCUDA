@@ -31,8 +31,6 @@ public:
         this->vx = 0;
         this->vy = 0;
     }
-    // konstruktor kopiujący
-    Planet(const Planet& other) : mass(other.mass), x(other.x), y(other.y), vx(other.vx), vy(other.vy) {}
     __host__ __device__ void updatePosition(float dt)
     {
         // Implementacja ruchu planet
@@ -64,8 +62,8 @@ __global__ void updatePositions(Planet* planets, int n, int t, double* x_coordin
     if (i < n)
     {
         // Pobranie pozycji planety do pamięci dzielonej
-        pos[0] = planets[i].x; //planets[i].x is impostor, coś z pamięcią nie teges
-        pos[1] = planets[i].y;
+        //pos[0] = planets[i].x; //planets[i].x is impostor, coś z pamięcią nie teges
+        //pos[1] = planets[i].y;
 
         // Synchronizacja wątków w bloku
         __syncthreads();
@@ -86,8 +84,8 @@ __global__ void updatePositions(Planet* planets, int n, int t, double* x_coordin
         // Aktualizacja pozycji planety
         //planets[i].x += Fx / planets[i].mass * dt;
         //planets[i].y += Fy / planets[i].mass * dt;
-        planets[i].x += 1e+12;
-        planets[i].y += 1e+11;
+        //planets[i].x += 1e+12;
+        //planets[i].y += 1e+11;
 
         // Zapis koordynatów do tablic
         x_coordinates[t*n + i] = 10;
@@ -138,6 +136,7 @@ int main()
         updatePositions << <1000, 1000 >> > (d_planets, n, t, d_x_coordinates, d_y_coordinates);
         cudaMemcpy(planets, d_planets, n, cudaMemcpyDeviceToHost);
         cudaMemcpy(x_coordinates, d_x_coordinates, size, cudaMemcpyDeviceToHost);
+        //cudaFree(d_planets);
         cudaThreadSynchronize();
         cudaDeviceSynchronize();
         cudaError_t error = cudaGetLastError();
@@ -147,9 +146,14 @@ int main()
             exit(-1);
         }
         printf("x = %.1f\n", x_coordinates[t * n]);
+        printf("x = %.1f\n", x_coordinates[t * n + 1]);
+        printf("x = %.1f\n", x_coordinates[t * n + 2]);
+        printf("x = %.1f\n", x_coordinates[t * n + 3]);
+        printf("x = %.1f\n", x_coordinates[t * n + 4]);
+
     }
     
-    printf("x = %.1d\n", x_coordinates[2 * n + 1]);
+    printf("x = %.1f\n", x_coordinates[2 * n + 1]);
     /*std::ofstream file("planets_coordinates2.csv");
     file << "x,y" << std::endl;
     for (int i = 0; i < n; i++)
@@ -158,7 +162,7 @@ int main()
     }
     file.close();
     */
-
+    cudaFree(d_planets);
     return 0;
 }
 

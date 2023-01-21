@@ -1,41 +1,34 @@
-import random
-import numpy as np
 import matplotlib.pyplot as plt
+import csv
 from matplotlib.animation import FuncAnimation
+import pandas as pd
+import numpy as np
 
-przed_x = 0,10000
-przed_y = 0,10000
-n=100000
-
-class Point:
-    def __init__(self):
-        self.x = random.uniform(przed_x[0],przed_x[1])
-        self.y = random.uniform(przed_y[0],przed_y[1])
-
-points = []
-px = []
-py = []
+x = []
+y = []
+x2 = []
+y2 = []
 fig, ax = plt.subplots()
-
-for i in range (n):
-    points.append(Point())
-    px.append(points[i].x)
-    py.append(points[i].y)
-
+#with open('planets_coordinates3.csv') as csvfile:
+   # reader = csv.DictReader(csvfile)
+  #  for row in reader:
+  #      x.append(float(row['x1']))
+ #        x2.append(float(row['x2']))
+#        y2.append(float(row['y2']))
+#point, = ax.plot([x[0]], [y[0]], '.')
+#point2, = ax.plot([x2[0]], [y2[0]], '.')
+# Wczytywanie pliku CSV do DataFrame
+df = pd.read_csv('planets_coordinates3.csv', header=None)
+#print(list(df.iloc[0][::2]))
+scat = ax.scatter(df.loc[0][::2], df.loc[0][1::2], c=np.random.rand(len(df.loc[0][::2]),3))
 def frame(i):
-    for p in points:
-        p.x += random.uniform(-0.1, 0.08) * np.sign(p.x)
-        p.y += random.uniform(-0.1, 0.08) * np.sign(p.y)
-
-
-    # Aktualizujemy kolekcję punktów (scatter plot)
-    scatter.set_offsets([[p.x, p.y] for p in points])
-
-
-
-ax.set_xlim(przed_x[0]-5,przed_x[1]+5)
-ax.set_ylim(przed_y[0]-5,przed_y[1]+5)
-scatter = ax.scatter(px,py, marker='.', s=1, color='k', linewidths=0)
-#plt.plot(hullx,hully)
-animation = FuncAnimation(fig, frame, frames=np.arange(10000), interval=200, repeat=False)
+    scat.set_offsets(np.c_[list(df.loc[i][::2]), list(df.loc[i][1::2])]) #tu normalnie osobno trzeba zrobic chyba, nie ['x1', 'y1']
+    pass
+print(list(df.loc[0][::2]))
+print([list(df.loc[0][::2]),list(df.loc[0][1::2])])
+print(np.c_[list(df.loc[0][::2]), list(df.loc[0][1::2])])
+ax.set_xlim(-3e13,3e13)
+ax.set_ylim(-3e13,3e13)
+plt.scatter(0, 0,marker='*', s=1, color='k', linewidths=1)
+animation = FuncAnimation(fig, frame, frames=range(len(df)), interval=200, repeat=True)
 plt.show()

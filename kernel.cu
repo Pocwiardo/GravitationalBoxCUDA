@@ -129,7 +129,7 @@ __global__ void updatePositions(Planet* planets, int n, int t, double* x_coordin
             vy += (Fy / mass) * TIMESTEP;
             x += vx * TIMESTEP;
             y += vy * TIMESTEP;
-            /*if (i == 0) {
+            /*if (i == 6) {
                 printf("Po: \n");
                 printf("  distx = %.10e ", distance_x);
                 printf("  r = %.10e\n", r);
@@ -154,8 +154,12 @@ __global__ void updatePositions(Planet* planets, int n, int t, double* x_coordin
         planets[i].y = y;
         planets[i].vx = vx;
         planets[i].vy = vy;
-        x_coordinates[t * n + i] = x;
-        y_coordinates[t * n + i] = y;
+        //x_coordinates[t * n + i] = x;
+        //y_coordinates[t * n + i] = y;
+        __syncthreads();
+        x_coordinates[i] = x;
+        y_coordinates[i] = y;
+        //printf("i = %d \n", i);
         /*if (i == 0) {
             printf("Po: \n");
             printf("  Fx = %.10e ", Fx);
@@ -193,7 +197,7 @@ int main()
     //GravitySource* d_sun;
     //cudaMalloc((void**)&d_sun, n);
     //planets = (Planet*)malloc(n);
-    cudaMalloc((void**)&d_planets, n);
+    cudaMalloc((void**)&d_planets, n * sizeof(Planet));
     //Planet planets[n];
     for (int i = 0; i < n; i++)
     {
@@ -201,23 +205,26 @@ int main()
         double y = y_dis(gen);
         double mass = mass_dis(gen);
         planets[i] = Planet(mass,x, 0);
+        
     }
+    printf("6 = %.1f\n", planets[6].x);
     double* x_coordinates, * y_coordinates;
     double* d_x_coordinates, * d_y_coordinates;
-    int size = (n * units) * sizeof(double);
+    //int size = (n * units) * sizeof(double);
+    int size = n * sizeof(double);
     cudaMalloc((void**)&d_x_coordinates, size);
     cudaMalloc((void**)&d_y_coordinates, size);
     x_coordinates = (double*)malloc(size);
     y_coordinates = (double*)malloc(size);
     std::ofstream file("planets_coordinates3.csv");
-    file << "x,y" << std::endl;
+    //file << "x1,y1,x2,y2" << std::endl;
     for (int t = 0; t < units; t++) {
 
-        cudaMemcpy(d_planets, planets, n, cudaMemcpyHostToDevice);
+        cudaMemcpy(d_planets, planets, n * sizeof(Planet), cudaMemcpyHostToDevice);
         cudaMemcpy(d_x_coordinates, x_coordinates, size, cudaMemcpyHostToDevice);
         cudaMemcpy(d_y_coordinates, y_coordinates, size, cudaMemcpyHostToDevice);
         updatePositions << <1000, 512 >> > (d_planets, n, t, d_x_coordinates, d_y_coordinates, sun);
-        cudaMemcpy(planets, d_planets, n, cudaMemcpyDeviceToHost);
+        cudaMemcpy(planets, d_planets, n * sizeof(Planet), cudaMemcpyDeviceToHost);
         cudaMemcpy(x_coordinates, d_x_coordinates, size, cudaMemcpyDeviceToHost);
         cudaMemcpy(y_coordinates, d_y_coordinates, size, cudaMemcpyDeviceToHost);
 
@@ -225,20 +232,27 @@ int main()
         cudaThreadSynchronize();
         cudaDeviceSynchronize();
         cudaError_t error = cudaGetLastError();
+        //printf("t = %d \n", t);
         if (error != cudaSuccess)
         {
             fprintf(stderr, "ERROR: %s\n", cudaGetErrorString(error));
             exit(-1);
         }
-        printf("x = %.10e ", x_coordinates[t * n]);
-        printf("y = %.10e\n", y_coordinates[t * n]);
-        file << x_coordinates[t * n] << "," << y_coordinates[t * n] << std::endl;
-        //printf("x = %.1f\n", x_coordinates[t * n + 1]);
-        //printf("x = %.1f\n", x_coordinates[t * n + 2]);
-        //printf("x = %.1f\n", x_coordinates[t * n + 3]);
-        //printf("x = %.1f\n", x_coordinates[t * n + 4]);
-
+        printf("x = %.10e ", x_coordinates[6]);
+        printf("y = %.10e\n", y_coordinates[6]);
+        for (int k = 0; k < n; k++) {
+            //file << x_coordinates[t * n + i] << "," << y_coordinates[t * n + i] << "," << x_coordinates[t * n + 1] << "," << y_coordinates[t * n + 1] << std::endl;
+            //file << x_coordinates[t * n + k] << "," << y_coordinates[t * n + k];
+            file << x_coordinates[k] << "," << y_coordinates[k];
+            if(k==n-1) file << std::endl;
+            else file << ",";
+            //printf("x = %.1f\n", x_coordinates[t * n + 1]);
+            //printf("x = %.1f\n", x_coordinates[t * n + 2]);
+            //printf("x = %.1f\n", x_coordinates[t * n + 3]);
+            //printf("x = %.1f\n", x_coordinates[t * n + 4]);
+        }
     }
+    //rintf("6 = %.10e ", planets[6].x);
     
     //printf("x = %.1f\n", x_coordinates[2 * n + 1]);
     /*std::ofstream file("planets_coordinates2.csv");
@@ -249,7 +263,7 @@ int main()
     }
     file.close();
     */
-    printf("aaaaa");
+    //printf("aaaaa");
     cudaFree(d_planets);
     cudaFree(d_x_coordinates);
     cudaFree(d_y_coordinates);

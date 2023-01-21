@@ -12,11 +12,12 @@
 #define CUDA_CALLABLE_MEMBER
 #endif 
 
+#define THREADS_PER_BLOCK 512
+
 cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size);
 
 const double AU = 1.496e+11;
 __device__ const double G = 6.67428e-11;
-const double SCALE = 250 / AU;  // 1AU = 100 pixels
 __device__ const double TIMESTEP = 3600 * 24; // 1 day
 
 
@@ -30,13 +31,13 @@ public:
     double vx;
     double vy;
     Planet() : mass(1E+23), x(AU), y(AU), vx(0),vy(0) {}
-    CUDA_CALLABLE_MEMBER Planet(double mass, double x, double y)
+    CUDA_CALLABLE_MEMBER Planet(double mass, double x, double y, double vx, double vy)
     {
         this->mass = mass;
         this->x = x;
-        this->y = 0;
-        this->vx = 0;
-        this->vy = 30000;
+        this->y = y;
+        this->vx = vx;
+        this->vy = vy;
     }
     CUDA_CALLABLE_MEMBER ~Planet()
     {
@@ -54,7 +55,7 @@ public:
     double y;
     double vx;
     double vy;
-    GravitySource() : mass(2E+30), x(0), y(0) {}
+    GravitySource() : mass(2E+30), x(0), y(0),vx(0),vy(0) {}
     CUDA_CALLABLE_MEMBER GravitySource(double mass, double x, double y)
     {
         this->mass = mass;
@@ -114,7 +115,7 @@ __global__ void updatePositions(Planet* planets, int n, int t, double* x_coordin
             Fx += F * cos(theta);
             Fy += F * sin(theta);
         }*/
-        for (int j = 0; j < 15; j++) {
+        for (int j = 0; j < 20; j++) {
             double distance_x = sun.x - x;
             double distance_y = sun.y - y;
             double r = sqrt(distance_x * distance_x + distance_y * distance_y);
@@ -122,7 +123,7 @@ __global__ void updatePositions(Planet* planets, int n, int t, double* x_coordin
             double theta = atan2(distance_y, distance_x);
             double F = G * sun.mass * mass / (r * r);
             Fx = F * cos(theta);
-            Fy = F * sin(theta); //z ta matma trzeba sprawdzic że sie wektor nie odwraca //to += chyb chociaz chuj wi
+            Fy = F * sin(theta); 
 
             // Aktualizacja pozycji planety
             vx += (Fx / mass) * TIMESTEP;
@@ -176,19 +177,21 @@ __global__ void updatePositions(Planet* planets, int n, int t, double* x_coordin
 
 int main()
 {
-    const int n = 100;
+    const int n = 20000;
     const int units = 100; //jednostki czasowe
-    const double MIN_X = -1.0 * AU;
-    const double MAX_X = 1.0 * AU;
-    const double MIN_Y = -1.0 * AU;
-    const double MAX_Y = 1.0 * AU;
+    const double X_COR = 10.0 * AU;
+    const double Y_COR = 0.0 * AU;
     const double MIN_MASS = 1E+23;
     const double MAX_MASS = 1E+25;
-    std::uniform_real_distribution<> y_dis(MIN_Y, MAX_Y);
-    std::uniform_real_distribution<> mass_dis(MIN_MASS, MAX_MASS);
+    const double X_VEL = 0;
+    const double Y_VEL = 50000;
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<> x_dis(MIN_X, MAX_X);
+    std::uniform_real_distribution<> mass_dis(MIN_MASS, MAX_MASS);
+    std::uniform_real_distribution<> vel_disX(-X_VEL, X_VEL);
+    std::uniform_real_distribution<> vel_disY(-Y_VEL, Y_VEL);
+    std::uniform_real_distribution<> x_dis(-X_COR, X_COR);
+    std::uniform_real_distribution<> y_dis(-Y_COR, Y_COR);
     Planet* planets = new Planet[n];;
     Planet* d_planets;
     GravitySource sun;
@@ -204,10 +207,12 @@ int main()
         double x = x_dis(gen);
         double y = y_dis(gen);
         double mass = mass_dis(gen);
-        planets[i] = Planet(mass,x, 0);
+        double vx = vel_disX(gen);
+        double vy = vel_disY(gen);
+        planets[i] = Planet(mass,x, y, vx, vy);
         
     }
-    printf("6 = %.1f\n", planets[6].x);
+    //printf("6 = %.1f\n", planets[6].x);
     double* x_coordinates, * y_coordinates;
     double* d_x_coordinates, * d_y_coordinates;
     //int size = (n * units) * sizeof(double);
@@ -216,14 +221,15 @@ int main()
     cudaMalloc((void**)&d_y_coordinates, size);
     x_coordinates = (double*)malloc(size);
     y_coordinates = (double*)malloc(size);
-    std::ofstream file("planets_coordinates3.csv");
+    std::ofstream file("planets_coordinates.csv");
     //file << "x1,y1,x2,y2" << std::endl;
+    unsigned int grid_size = ceil(n / THREADS_PER_BLOCK) + 1;
     for (int t = 0; t < units; t++) {
 
         cudaMemcpy(d_planets, planets, n * sizeof(Planet), cudaMemcpyHostToDevice);
         cudaMemcpy(d_x_coordinates, x_coordinates, size, cudaMemcpyHostToDevice);
         cudaMemcpy(d_y_coordinates, y_coordinates, size, cudaMemcpyHostToDevice);
-        updatePositions << <1000, 512 >> > (d_planets, n, t, d_x_coordinates, d_y_coordinates, sun);
+        updatePositions << <grid_size, THREADS_PER_BLOCK >> > (d_planets, n, t, d_x_coordinates, d_y_coordinates, sun);
         cudaMemcpy(planets, d_planets, n * sizeof(Planet), cudaMemcpyDeviceToHost);
         cudaMemcpy(x_coordinates, d_x_coordinates, size, cudaMemcpyDeviceToHost);
         cudaMemcpy(y_coordinates, d_y_coordinates, size, cudaMemcpyDeviceToHost);
@@ -238,8 +244,8 @@ int main()
             fprintf(stderr, "ERROR: %s\n", cudaGetErrorString(error));
             exit(-1);
         }
-        printf("x = %.10e ", x_coordinates[6]);
-        printf("y = %.10e\n", y_coordinates[6]);
+        //printf("x = %.10e ", x_coordinates[6]);
+        //printf("y = %.10e\n", y_coordinates[6]);
         for (int k = 0; k < n; k++) {
             //file << x_coordinates[t * n + i] << "," << y_coordinates[t * n + i] << "," << x_coordinates[t * n + 1] << "," << y_coordinates[t * n + 1] << std::endl;
             //file << x_coordinates[t * n + k] << "," << y_coordinates[t * n + k];
@@ -264,17 +270,14 @@ int main()
     file.close();
     */
     //printf("aaaaa");
+    file.close();
     cudaFree(d_planets);
     cudaFree(d_x_coordinates);
     cudaFree(d_y_coordinates);
     //free(planets);
     free(x_coordinates);
     free(y_coordinates);
-    //for (int i = 0; i < n; i++)
-    //{
-    //    cudaFree(d_planets + i);
-    //    free(planets + i);
-    //}
+    
     delete[] planets;
     return 0;
 }

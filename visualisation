@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import csv
 from matplotlib.animation import FuncAnimation
 import pandas as pd
 import numpy as np
@@ -9,20 +8,14 @@ fig, ax = plt.subplots()
 #ax = fig.add_subplot(projection='3d')
 
 df = pd.read_csv('planets_coordinates.csv', header=None)
-#print(df.shape)
-#print(list(df.iloc[0][::2]))
-#scat = ax.scatter(df.loc[0][::2], df.loc[0][1::2], 0, c=np.random.rand(len(df.loc[0][::2]),3), s=1, linewidths=0)
+dfs = pd.read_csv('sources_coordinates.csv', header=None)
 scat = ax.scatter(df.loc[0][::2], df.loc[0][1::2], c=np.random.rand(len(df.loc[0][::2]),3), s=1, linewidths=0)
 def frame(i):
     #scat.set_offsets(np.c_[list(df.loc[i][::2]), list(df.loc[i][1::2]), [0]*10000])
     scat.set_offsets(np.c_[list(df.loc[i][::2]), list(df.loc[i][1::2])])
-    #pass
-#print(list(df.loc[0][::2]))
-#print([list(df.loc[0][::2]),list(df.loc[0][1::2])])
-#print(np.c_[list(df.loc[0][::2]), list(df.loc[0][1::2])])
-ax.set_xlim(-3e13,3e13)
-ax.set_ylim(-3e13,3e13)
+ax.set_xlim(-1e13,1e13)
+ax.set_ylim(-1e13,1e13)
 #plt.scatter(0, 0,0,marker='o',color='k')
-plt.scatter(0, 0,marker='o',color='k')
+plt.scatter(dfs.loc[0][::2], dfs.loc[0][1::2], marker='o',color='k')
 animation = FuncAnimation(fig, frame, frames=range(len(df)), interval=0, repeat=True)
 plt.show()

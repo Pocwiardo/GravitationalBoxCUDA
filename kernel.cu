@@ -14,14 +14,12 @@
 #endif 
 
 #define THREADS_PER_BLOCK 512
-#define INTERVAL 20
 
-cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size);
-
-const double AU = 1.496e+11;
+#define INTERVAL 20 //kroki obliczeń wykonywane w jednym wątku (zanim dane zostaną zapisane do pliku), efektywnie ilość dni / krok symulacyjny
+#define UNITS 1000 //jednostki czasowe (długość symulacji)
+const double AU = 1.496e+11; //jednostka astronomiczna
 __device__ const double G = 6.67428e-11;
-__device__ const double TIMESTEP = 3600 * 24; // 1 day
-const int UNITS = 100; //jednostki czasowe
+__device__ const double TIMESTEP = 3600 * 24; // 1 dzień (krok symulacji)
 
 
 
@@ -45,7 +43,6 @@ public:
     }
     CUDA_CALLABLE_MEMBER ~Planet()
     {
-        //cudaFree(mass);
     }
 
 private:
@@ -79,13 +76,9 @@ __global__ void updatePositions(Planet* planets, int n, int n_source, double* x_
     int i = blockIdx.x * blockDim.x + threadIdx.x;
 
     
-    //__shared__ double x;
-    //__shared__ double y;
-
-    
     if (i < n)
     {
-        // Pobranie pozycji planety do pamięci dzielonej
+       
         double x = planets[i].x; 
         double y = planets[i].y;
         double vx = planets[i].vx;
@@ -110,15 +103,48 @@ __global__ void updatePositions(Planet* planets, int n, int n_source, double* x_
             x += vx * TIMESTEP;
             y += vy * TIMESTEP;
         }
-        //__syncthreads();
         planets[i].x = x;
         planets[i].y = y;
         planets[i].vx = vx;
         planets[i].vy = vy;
-        __syncthreads();
         x_coordinates[i] = x;
         y_coordinates[i] = y;
         
+    }
+}
+void updatePositionsCPU(Planet* planets, int n, int n_source, double* x_coordinates, double* y_coordinates, GravitySource* source) {
+    for (int i = 0; i < n; i++) {
+        double x = planets[i].x;
+        double y = planets[i].y;
+        double vx = planets[i].vx;
+        double vy = planets[i].vy;
+        double mass = planets[i].mass;
+
+        for (int j = 0; j < INTERVAL; j++) {
+            double Fx = 0;
+            double Fy = 0;
+            for (int k = 0; k < n_source; k++) {
+                double distance_x = source[k].x - x;
+                double distance_y = source[k].y - y;
+                double r = sqrt(distance_x * distance_x + distance_y * distance_y);
+                double theta = atan2(distance_y, distance_x);
+                double F = G * source[k].mass * mass / (r * r);
+                Fx += F * cos(theta);
+                Fy += F * sin(theta);
+
+            }
+            vx += (Fx / mass) * TIMESTEP;
+            vy += (Fy / mass) * TIMESTEP;
+            x += vx * TIMESTEP;
+            y += vy * TIMESTEP;
+        }
+        planets[i].x = x;
+        planets[i].y = y;
+        planets[i].vx = vx;
+        planets[i].vy = vy;
+        x_coordinates[i] = x;
+        y_coordinates[i] = y;
+
     }
 }
 
@@ -147,7 +173,7 @@ int main()
     std::uniform_real_distribution<> y_dis(-Y_COR, Y_COR);
     std::uniform_real_distribution<> source_x_dis(-SOURCE_COR, SOURCE_COR);
     std::uniform_real_distribution<> source_y_dis(-SOURCE_COR, SOURCE_COR);
-    double source_masses[3] = { 2E+30, 8E+30, 1E+30 };
+    //double source_masses[3] = { 2E+30, 8E+30, 1E+30 };
 
     Planet* planets = new Planet[n];
     Planet* d_planets;
@@ -204,7 +230,7 @@ int main()
     //file << "x1,y1,x2,y2" << std::endl;
     unsigned int grid_size = ceil(n / THREADS_PER_BLOCK) + 1;
     for (int t = 0; t < UNITS; t++) {
-
+        /*
         cudaMemcpy(d_source, source, n_source * sizeof(GravitySource), cudaMemcpyHostToDevice);
         cudaMemcpy(d_planets, planets, n * sizeof(Planet), cudaMemcpyHostToDevice);
         cudaMemcpy(d_x_coordinates, x_coordinates, size, cudaMemcpyHostToDevice);
@@ -225,6 +251,9 @@ int main()
             fprintf(stderr, "ERROR: %s\n", cudaGetErrorString(error));
             exit(-1);
         }
+        */
+        updatePositionsCPU(planets, n, n_source, x_coordinates, y_coordinates, source);
+
         for (int k = 0; k < n; k++) {
             file << x_coordinates[k] << "," << y_coordinates[k];
             if(k==n-1) file << std::endl;

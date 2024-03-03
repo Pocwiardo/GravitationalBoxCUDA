@@ -5,7 +5,6 @@ import numpy as np
 
 
 fig, ax = plt.subplots()
-#ax = fig.add_subplot(projection='3d')
 
 df = pd.read_csv('planets_coordinates.csv', header=None)
 dfs = pd.read_csv('sources_coordinates.csv', header=None)

@@ -20,3 +20,4 @@ is calculated using the gravity equation, and acceleration - from the second law
 
 Coordinates of the planets can be visualised in Python using matplotlib library. Simulation of hundreds of thousands planets makes an interesting visualisation. We can observe that with random velocities and positions, although most particles leave their system or fall on the gravity source, many move stable on the orbit.
 
+![gif](./images_readme/example.gif)
